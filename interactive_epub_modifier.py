@@ -91,8 +91,11 @@ p, div, span, td, th {{
 }}
 """
 
-def find_css_file(temp_dir):
-    """Найти основной CSS файл в распакованном EPUB"""
+def find_css_files(temp_dir):
+    """Найти все CSS файлы в распакованном EPUB"""
+    css_files = []
+    
+    # Стандартные места
     possible_paths = [
         "OPS/style.css",
         "OEBPS/style.css", 
@@ -103,9 +106,16 @@ def find_css_file(temp_dir):
     for path in possible_paths:
         css_path = os.path.join(temp_dir, path)
         if os.path.exists(css_path):
-            return css_path
+            css_files.append(css_path)
     
-    return None
+    # Поиск CSS файлов в корне
+    for file in os.listdir(temp_dir):
+        if file.endswith('.css'):
+            css_path = os.path.join(temp_dir, file)
+            if css_path not in css_files:
+                css_files.append(css_path)
+    
+    return css_files
 
 def process_epub(epub_path, modification_type, margin_size=20, output_mode="folder", output_dir=None):
     """Обработать один EPUB файл"""
@@ -135,21 +145,24 @@ def process_epub(epub_path, modification_type, margin_size=20, output_mode="fold
         with zipfile.ZipFile(epub_path, 'r') as zip_ref:
             zip_ref.extractall(temp_dir)
         
-        # Найти CSS файл
-        css_file = find_css_file(temp_dir)
+        # Найти CSS файлы
+        css_files = find_css_files(temp_dir)
         
-        if css_file is None:
-            print("  CSS файл не найден, создаю новый...")
-            # Создать CSS файл если его нет
+        if not css_files:
+            print("  CSS файлы не найдены, создаю новый...")
+            # Создать CSS файл если их нет
             ops_dir = os.path.join(temp_dir, "OPS")
             os.makedirs(ops_dir, exist_ok=True)
             css_file = os.path.join(ops_dir, "style.css")
             with open(css_file, 'w', encoding='utf-8') as f:
                 f.write("/* Автоматически созданный CSS */\n")
+            css_files = [css_file]
         
-        # Добавить CSS модификации
-        with open(css_file, 'a', encoding='utf-8') as f:
-            f.write(css_content)
+        # Добавить CSS модификации ко всем найденным CSS файлам
+        for css_file in css_files:
+            print(f"  Модифицирую: {os.path.basename(css_file)}")
+            with open(css_file, 'a', encoding='utf-8') as f:
+                f.write(css_content)
         
         # Создать новый EPUB файл
         with zipfile.ZipFile(output_path, 'w') as zip_out:
